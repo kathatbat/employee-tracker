@@ -27,7 +27,7 @@ function startApp() {
             viewRoles();
             break;
           case 'View all employees':
-            viewEmployees();
+            viewAllEmployees();
             break;
           case 'Add a department':
             addDepartment();
@@ -74,18 +74,34 @@ function startApp() {
     });
   }
   
-  function viewEmployees() {
-    const query =
-      'SELECT employees.id, employees.first_name, employees.last_name, role.title, department.name AS department, role.salary, CONCAT(manager.first_name, " ", manager.last_name) AS manager FROM employees LEFT JOIN role ON employees.role_id = role.id LEFT JOIN department ON role.department_id = department.id LEFT JOIN employees manager ON employees.manager_id = manager.id';
+  function viewAllEmployees() {
+    const viewAllEmployeesQuery = `
+      SELECT 
+          employees.id, 
+          employees.first_name, 
+          employees.last_name, 
+          role.title AS role,
+          role.salary,
+          department.name AS department,
+          CONCAT(manager.first_name, ' ', manager.last_name) AS manager
+      FROM employees
+      LEFT JOIN role ON employees.role_id = role.id
+      LEFT JOIN department ON role.department_id = department.id
+      LEFT JOIN employees AS manager ON employees.manager_id = manager.id;
+    `;
   
-    db.query(query, (err, results) => {
-      if (err) throw err;
+    db.query(viewAllEmployeesQuery, (err, results) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        throw err;
+      }
   
+      console.log('Query Results:', results);
       console.table(results);
   
       startApp();
     });
-  }
+  }  
 
   function addDepartment() {
     inquirer
@@ -142,81 +158,81 @@ function startApp() {
 }
 
 async function addEmployee() {
-    const departmentChoices = await getDepartmentChoices();
+  const departmentChoices = await getDepartmentChoices();
 
-    inquirer
-        .prompt([
-            {
-                type: 'input',
-                name: 'first_name',
-                message: 'Enter your first name.',
-            },
-            {
-                type: 'input',
-                name: 'last_name',
-                message: 'Enter your last name.',
-            },
-            {
-                type: 'input',
-                name: 'role',
-                message: 'Enter the name of the role.',
-            },
-            {
-                type: 'input',
-                name: 'salary',
-                message: 'Enter the salary for this role.',
-            },
-            {
-                type: 'rawlist',
-                name: 'department',
-                message: 'Choose the department for this role:',
-                choices: departmentChoices,
-            },
-            {
-                type: 'input',
-                name: 'manager',
-                message: 'Enter the manager name.',
-            },
-        ])
-        .then((answers) => {
-            const roleQuery = 'SELECT id FROM role WHERE title = ?';
-            db.query(roleQuery, [answers.role], (roleErr, roleResults) => {
-                if (roleErr) throw roleErr;
+  inquirer
+      .prompt([
+          {
+              type: 'input',
+              name: 'first_name',
+              message: 'Enter your first name.',
+          },
+          {
+              type: 'input',
+              name: 'last_name',
+              message: 'Enter your last name.',
+          },
+          {
+              type: 'input',
+              name: 'role',
+              message: 'Enter the name of the role.',
+          },
+          {
+              type: 'input',
+              name: 'salary',
+              message: 'Enter the salary for this role (e.g., 30000.00):',
+          },
+          {
+              type: 'rawlist',
+              name: 'department',
+              message: 'Choose the department for this role:',
+              choices: departmentChoices,
+          },
+          {
+              type: 'input',
+              name: 'manager',
+              message: 'Enter the manager name.',
+          },
+      ])
+      .then((answers) => {
+          const roleQuery = 'SELECT id FROM role WHERE title = ?';
+          db.query(roleQuery, [answers.role], (roleErr, roleResults) => {
+            if (roleErr) throw roleErr;
 
-                if (roleResults.length === 0) {
-                    console.log('Role not found. Please add the role first.');
-                    startApp();
-                    return;
-                }
+            if (roleResults.length === 0) {
+             console.log('Role not found. Please add the role first.');
+              startApp();
+              return;
+            }
 
-                const managerQuery = 'SELECT id FROM employees WHERE CONCAT(first_name, " ", last_name) = ?';
-                db.query(managerQuery, [answers.manager], (managerErr, managerResults) => {
-                    if (managerErr) throw managerErr;
+       const managerQuery = 'SELECT id FROM employees WHERE CONCAT(first_name, " ", last_name) = ?';
+            db.query(managerQuery, [answers.manager], (managerErr, managerResults) => {
+            if (managerErr) throw managerErr;
 
-                    const departmentQuery = 'SELECT id FROM department WHERE name = ?';
-                    db.query(departmentQuery, [answers.department], (deptErr, deptResults) => {
-                        if (deptErr) throw deptErr;
+          const departmentQuery = 'SELECT id FROM department WHERE name = ?';
+          db.query(departmentQuery, [answers.department], (deptErr, deptResults) => {
+          if (deptErr) throw deptErr;
 
-                        const insertQuery = 'INSERT INTO employees SET ?';
-                        const newEmployee = {
-                            first_name: answers.first_name,
-                            last_name: answers.last_name,
-                            role_id: roleResults[0].id,
-                            salary: answers.salary,
-                            department_id: deptResults[0].id,
-                            manager_id: managerResults[0] ? managerResults[0].id : null,
-                        };
+          const insertQuery = 'INSERT INTO employees SET ?';
+          const newEmployee = {
+          first_name: answers.first_name,
+          last_name: answers.last_name,
+          role_id: roleResults[0].id,
+          salary: answers.salary,
+          department_id: deptResults[0].id,
+          manager_id: managerResults[0] ? managerResults[0].id : null,
+          };
 
-                        db.query(insertQuery, newEmployee, (insertErr, insertResults) => {
-                            if (insertErr) throw insertErr;
+          db.query(insertQuery, newEmployee, (insertErr, insertResults) => {
+          if (insertErr) throw insertErr;
 
-                            console.log('Employee added successfully!');
-                            startApp();
-                        });
-                    });
-                });
+          console.log('Employee added successfully!');
+          startApp();
+              });
             });
-        });
+          });
+       });
+      });
 }
 
 
